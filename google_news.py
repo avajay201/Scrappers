@@ -5,6 +5,7 @@ import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, Alignment
+import random
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
@@ -23,7 +24,7 @@ def get_html_selenium(url, scroll_pause=0.5, scroll_step=300):
         scroll_step (int): Number of pixels to scroll per step.
     """
     options = Options()
-    # options.add_argument("--headless")  # Run in background
+    options.add_argument("--headless")  # Run in background
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36")
@@ -65,18 +66,19 @@ def get_html_selenium(url, scroll_pause=0.5, scroll_step=300):
     
     return page_source
 
-def scrape(url, news_scrape=10):
+def scrape(s_url, url, news_scrape):
     """
     Scrapes news data from the given search URL and saves the page locally.
 
     Args:
-        url (str): The search URL to scrape.
-        news_scrape (int, optional): Number of newss to scrape. Default is 10.
+        s_url (str): The search URL to scrape.
+        url (str): Main domain URL.
+        news_scrape (int, optional): Number of newss to scrape.
 
     Returns:
         bool: True if scraping is successful, False otherwise.
     """
-    print(f"🔍 Scraping {news_scrape} {'newss' if news_scrape > 1 else 'news'} from {url}...\n")
+    print(f"🔍 Scraping {news_scrape} {'newss' if news_scrape > 1 else 'news'} from {s_url}...\n")
 
     try:
         # Generate a unique filename for storing the response
@@ -84,20 +86,18 @@ def scrape(url, news_scrape=10):
         file_path = os.path.join("temp_files", file_name)
 
         # Get html content to selenium
-        html_content = get_html_selenium(url)
+        html_content = get_html_selenium(s_url)
         with open(file_path, 'w') as f:
             f.write(html_content)
 
         # Call function to extract news details
-        result = scrape_newss(file_path, news_scrape)
-        if not result:
-            return result
-        return True
+        result = scrape_newss(file_path, news_scrape, url)
+        return result
     except Exception as err:
         print(f"❌ [ERROR] Unexpected Error: {err}\n")
     return None
 
-def scrape_newss(file_path, news_scrape):
+def scrape_newss(file_path, news_scrape, url):
     """
     Extracts news information from the stored HTML file and saves it in Excel.
 
@@ -133,7 +133,7 @@ def scrape_newss(file_path, news_scrape):
         scrapped_newss = []
 
         # Extract details for each news
-        for news in newss:
+        for i, news in enumerate(newss):
             news_provider = news.find(class_="zC7z7b").attrs.get("src") if news.find(class_="zC7z7b") else ""
             news_title = news.find(class_="JtKRv").text if news.find(class_="JtKRv") else ""
             news_image = news.find(class_="Quavad").attrs.get("src") if news.find(class_="Quavad") else ""
@@ -144,10 +144,11 @@ def scrape_newss(file_path, news_scrape):
                 continue
 
             news_data = {
+                "SNo": i + 1,
                 "Provider": news_provider,
                 "Title": news_title,
-                "Image": news_image,
-                "Time": news_time,
+                "Image": url + news_image,
+                "Time": datetime.strptime(news_time, "%Y-%m-%dT%H:%M:%SZ").strftime("%d %b %Y") if news_time else "",
                 "Link": url + news_link,
             }
 
@@ -167,7 +168,7 @@ def scrape_newss(file_path, news_scrape):
     # Save extracted newss to an Excel file
     save_to_excel(scrapped_newss)
     print(f"✅ {len(scrapped_newss)} {'newss' if news_scrape > 1 else 'news'} scrapped successfully.\n")
-    return True
+    return scrapped_newss
 
 def save_to_excel(newss):
     """
@@ -242,6 +243,26 @@ def clean(file_path):
     except Exception as e:
         print(f"❌ Error while deleting file {file_path}: {e}\n")
 
+def start_g_news_scrapper(search_key):
+    """
+    Start scrapping
+    """
+    # Ensure the 'temp_files' directory exists
+    os.makedirs("temp_files", exist_ok=True)
+
+    # Generate a random number between 1 - 50
+    news_scrape = random.randint(1, 50)
+
+    url = "https://news.google.com"
+
+    # Construct search URL
+    search_url = f"{url}/search?q={search_key}"
+
+    # Call the scrape function with the provided number of products
+    result = scrape(search_url, url, news_scrape)
+
+    return result
+
 
 if __name__ == "__main__":
     # Ensure the 'temp_files' directory exists
@@ -280,7 +301,7 @@ if __name__ == "__main__":
     search_url = f"{url}/search?q={search_key}"
 
     # Call the scrape function with the provided number of news
-    result = scrape(search_url, news_scrape)
+    result = scrape(search_url, url, news_scrape)
 
     # Display final success/failure message
     if result:
