@@ -5,6 +5,7 @@ import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, Alignment
+import random
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
@@ -65,18 +66,19 @@ def get_html_selenium(url, scroll_pause=0.5, scroll_step=300):
     
     return page_source
 
-def scrape(url, products_scrape=10):
+def scrape(s_url, url, products_scrape):
     """
     Scrapes product data from the given search URL and saves the page locally.
 
     Args:
-        url (str): The search URL to scrape.
+        s_url (str): The search URL to scrape.
+        url (str): Main domain URL.
         products_scrape (int, optional): Number of products to scrape. Default is 10.
 
     Returns:
         bool: True if scraping is successful, False otherwise.
     """
-    print(f"🔍 Scraping {products_scrape} {'products' if products_scrape > 1 else 'product'} from {url}...\n")
+    print(f"🔍 Scraping {products_scrape} {'products' if products_scrape > 1 else 'product'} from {s_url}...\n")
 
     try:
         # Generate a unique filename for storing the response
@@ -84,20 +86,18 @@ def scrape(url, products_scrape=10):
         file_path = os.path.join("temp_files", file_name)
 
         # Get html content to selenium
-        html_content = get_html_selenium(url)
+        html_content = get_html_selenium(s_url)
         with open(file_path, 'w') as f:
             f.write(html_content)
 
         # Call function to extract product details
-        result = scrape_products(file_path, products_scrape)
-        if not result:
-            return result
-        return True
+        result = scrape_products(file_path, products_scrape, url)
+        return result
     except Exception as err:
         print(f"❌ [ERROR] Unexpected Error: {err}\n")
     return None
 
-def scrape_products(file_path, products_scrape):
+def scrape_products(file_path, products_scrape, url):
     """
     Extracts product information from the stored HTML file and saves it in Excel.
 
@@ -134,7 +134,7 @@ def scrape_products(file_path, products_scrape):
         scrapped_products = []
 
         # Extract details for each product
-        for product in products:
+        for i, product in enumerate(products):
             product_name = product.find(class_=products_name_class).text if product.find(class_=products_name_class) else ""
             product_image = product.find("picture").find("img").attrs.get("src") if product.find("picture") and product.find("picture").find("img") else ""
             product_price = product.find(class_=products_price_class).text if product.find(class_=products_price_class) else ""
@@ -145,6 +145,7 @@ def scrape_products(file_path, products_scrape):
                 continue
 
             product_data = {
+                "SNo": i + 1,
                 "Name": product_name,
                 "Image": product_image,
                 "Price": product_price,
@@ -168,7 +169,7 @@ def scrape_products(file_path, products_scrape):
     # Save extracted products to an Excel file
     save_to_excel(scrapped_products)
     print(f"✅ {len(scrapped_products)} {'products' if products_scrape > 1 else 'product'} scrapped successfully.\n")
-    return True
+    return scrapped_products
 
 def save_to_excel(products):
     """
@@ -243,6 +244,26 @@ def clean(file_path):
     except Exception as e:
         print(f"❌ Error while deleting file {file_path}: {e}\n")
 
+def start_myntra_scrapper(search_key):
+    """
+    Start scrapping
+    """
+    # Ensure the 'temp_files' directory exists
+    os.makedirs("temp_files", exist_ok=True)
+
+    # Generate a random number between 1 - 50
+    products_scrape = random.randint(1, 50)
+
+    url = "https://www.myntra.com"
+
+    # Construct search URL
+    search_url = f"{url}/{search_key}"
+
+    # Call the scrape function with the provided number of products
+    result = scrape(search_url, url, products_scrape)
+
+    return result
+
 
 if __name__ == "__main__":
     # Ensure the 'temp_files' directory exists
@@ -281,7 +302,7 @@ if __name__ == "__main__":
     search_url = f"{url}/{search_key}"
 
     # Call the scrape function with the provided number of products
-    result = scrape(search_url, products_scrape)
+    result = scrape(search_url, url, products_scrape)
 
     # Display final success/failure message
     if result:
