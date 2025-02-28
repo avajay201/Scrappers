@@ -5,22 +5,24 @@ import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, Alignment
+import random
 import requests
 import uuid
 
 
-def scrape(url, products_scrape=10):
+def scrape(s_url, url, products_scrape):
     """
     Scrapes product data from the given search URL and saves the page locally.
 
     Args:
-        url (str): The search URL to scrape.
-        products_scrape (int, optional): Number of products to scrape. Default is 10.
+        s_url (str): The search URL to scrape.
+        url (str): Main domain URL.
+        products_scrape (int, optional): Number of products to scrape.
 
     Returns:
         bool: True if scraping is successful, False otherwise.
     """
-    print(f"🔍 Scraping {products_scrape} {'products' if products_scrape > 1 else 'product'} from {url}...\n")
+    print(f"🔍 Scraping {products_scrape} {'products' if products_scrape > 1 else 'product'} from {s_url}...\n")
 
     try:
         # Generate a unique filename for storing the response
@@ -28,7 +30,7 @@ def scrape(url, products_scrape=10):
         file_path = os.path.join("temp_files", file_name)
 
         # Send GET request to the URL
-        response = requests.get(url, timeout=10)
+        response = requests.get(s_url, timeout=10)
         response.raise_for_status()  # Raise exception for HTTP errors
 
         if response.status_code == 200:
@@ -37,17 +39,15 @@ def scrape(url, products_scrape=10):
                 f.write(response.content)
 
             # Call function to extract product details
-            result = scrape_products(file_path, products_scrape)
-            if not result:
-                return result
-            return True
+            result = scrape_products(file_path, products_scrape, url)
+            return result
         else:
-            print(f"❌ [ERROR] Failed to scrape {url}, Status Code: {response.status_code}\n")
+            print(f"❌ [ERROR] Failed to scrape {s_url}, Status Code: {response.status_code}\n")
             return None
     except requests.ConnectionError:
-        print(f"❌ [ERROR] Connection Error: Failed to connect to {url}\n")
+        print(f"❌ [ERROR] Connection Error: Failed to connect to {s_url}\n")
     except requests.ConnectTimeout:
-        print(f"⏳ [ERROR] Timeout Error: {url} took too long to respond\n")
+        print(f"⏳ [ERROR] Timeout Error: {s_url} took too long to respond\n")
     except requests.HTTPError as http_err:
         print(f"❌ [ERROR] HTTP Error: {http_err}\n")
     except requests.RequestException as req_err:
@@ -56,7 +56,7 @@ def scrape(url, products_scrape=10):
         print(f"❌ [ERROR] Unexpected Error: {err}\n")
     return None
 
-def scrape_products(file_path, products_scrape):
+def scrape_products(file_path, products_scrape, url):
     """
     Extracts product information from the stored HTML file and saves it in Excel.
 
@@ -116,7 +116,7 @@ def scrape_products(file_path, products_scrape):
         scrapped_products = []
 
         # Extract details for each product
-        for product in products:
+        for i, product in enumerate(products):
             product_link = product.find("a").attrs.get("href") if product.find("a") else ""
             if not is_vertical:
                 a_tags = product.find_all("a")
@@ -137,6 +137,7 @@ def scrape_products(file_path, products_scrape):
                 continue
 
             product_data = {
+                "SNo": i + 1,
                 "Name": product_name,
                 "Image": product_image,
                 "Price": product_price,
@@ -169,7 +170,7 @@ def scrape_products(file_path, products_scrape):
     # Save extracted products to an Excel file
     save_to_excel(scrapped_products)
     print(f"✅ {len(scrapped_products)} {'products' if products_scrape > 1 else 'product'} scrapped successfully.\n")
-    return True
+    return scrapped_products
 
 def save_to_excel(products):
     """
@@ -250,6 +251,26 @@ def clean(file_path):
     except Exception as e:
         print(f"❌ Error while deleting file {file_path}: {e}\n")
 
+def start_flipkart_scrapper(search_key):
+    """
+    Start scrapping
+    """
+    # Ensure the 'temp_files' directory exists
+    os.makedirs("temp_files", exist_ok=True)
+
+    # Generate a random number between 1 - 50
+    products_scrape = random.randint(1, 50)
+
+    url = "https://www.flipkart.com"
+
+    # Construct search URL
+    search_url = f"{url}/search?q={search_key}"
+
+    # Call the scrape function with the provided number of products
+    result = scrape(search_url, url, products_scrape)
+
+    return result
+
 
 if __name__ == "__main__":
     # Ensure the 'temp_files' directory exists
@@ -288,7 +309,7 @@ if __name__ == "__main__":
     search_url = f"{url}/search?q={search_key}"
 
     # Call the scrape function with the provided number of products
-    result = scrape(search_url, products_scrape)
+    result = scrape(search_url, url, products_scrape)
 
     # Display final success/failure message
     if result:
