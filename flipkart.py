@@ -150,7 +150,7 @@ def scrape_products(file_path, products_scrape, url):
                 product_desc_lis = product_desc_container.find_all("li")
                 product_desc = [li.text for li in product_desc_lis]
 
-                product_rating = product.find(class_=products_rating_class).text
+                product_rating = product.find(class_=products_rating_class).text if product.find(class_=products_rating_class) else ""
 
                 product_data["Description"] = product_desc
                 product_data["Rating"] = product_rating

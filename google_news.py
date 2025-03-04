@@ -87,7 +87,7 @@ def scrape(s_url, url, news_scrape):
 
         # Get html content to selenium
         html_content = get_html_selenium(s_url)
-        with open(file_path, 'w') as f:
+        with open(file_path, 'w', encoding='utf-8') as f:
             f.write(html_content)
 
         # Call function to extract news details
